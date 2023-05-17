@@ -16,17 +16,21 @@
  */
 int enlist_vm_freerg_list(struct mm_struct *mm, struct vm_rg_struct rg_elmt)
 {
+  
   struct vm_rg_struct *rg_node = mm->mmap->vm_freerg_list;
 
-  if (rg_elmt.rg_start >= rg_elmt.rg_end)
+  if (rg_elmt.rg_start >= rg_elmt.rg_end){
+    printf("overlap rg_elmt start and end\n");
     return -1;
-
+  }
+    
+  
   if (rg_node != NULL)
     rg_elmt.rg_next = rg_node;
-
-  /* Enlist the new region */
+  
+  /* Enlist the new region (fifo) */
   mm->mmap->vm_freerg_list = &rg_elmt;
-
+  printf("successfully enlist_vm_freerg list \n");
   return 0;
 }
 
@@ -109,7 +113,7 @@ int __alloc(struct pcb_t *caller, int vmaid, int rgid, int size, int *alloc_addr
   caller->mm->symrgtbl[rgid].rg_end = old_sbrk + size;
 
   *alloc_addr = old_sbrk;
-
+  printf("SYSTEM allocated, from %d to %d \n", old_sbrk, old_sbrk+size);
   return 0;
 }
 
@@ -118,17 +122,29 @@ int __alloc(struct pcb_t *caller, int vmaid, int rgid, int size, int *alloc_addr
  *@vmaid: ID vm area to alloc memory region
  *@rgid: memory region ID (used to identify variable in symbole table)
  *@size: allocated size 
- *
+ *put free region to freerg_list
  */
 int __free(struct pcb_t *caller, int vmaid, int rgid)
 {
-  struct vm_rg_struct rgnode;
+  struct vm_rg_struct rgnode; 
 
   if(rgid < 0 || rgid > PAGING_MAX_SYMTBL_SZ)
     return -1;
 
    /* TODO: Manage the collect freed region to freerg_list */
+   struct vm_area_struct *cur_vma = get_vma_by_num(caller->mm, vmaid);
+  rgnode = caller->mm->symrgtbl[rgid];
+   printf("in __free, rgnode aka symrgtbl[%d] has rg_start = %d, rg_end = %d \n", rgid, rgnode.rg_start, rgnode.rg_end);
+  printf(" PAGING_PAGE_ALIGNSZ(rgnode.rg_end - rgnode.rg_start) = %d \n ", PAGING_PAGE_ALIGNSZ(rgnode.rg_end - rgnode.rg_start));
+  printf("caller->mm->symrgtbl[%d] :  rg_start = %d, rg_end = %d \n", rgid,caller->mm->symrgtbl[rgid].rg_start,caller->mm->symrgtbl[rgid].rg_end );
+  printf("SYSTEM freed region which had the size of %d, from %d to %d \n",PAGING_PAGE_ALIGNSZ(rgnode.rg_end - rgnode.rg_start), caller->mm->symrgtbl[rgid].rg_start , caller->mm->symrgtbl[rgid].rg_end);
   
+  
+  
+  //put free region to freerg_list
+  // caller->mm->symrgtbl[rgid].rg_end = caller->mm->symrgtbl[rgid].rg_start;
+   enlist_vm_freerg_list(caller->mm, caller->mm->symrgtbl[rgid]);
+
   return 0;
 }
 
@@ -152,7 +168,8 @@ int pgalloc(struct pcb_t *proc, uint32_t size, uint32_t reg_index)
  */
 
 int pgfree_data(struct pcb_t *proc, uint32_t reg_index)
-{
+{   
+  printf("SYSTEM IS IN FREEING STATE .... \n");
    return __free(proc, 0, reg_index);
 }
 
